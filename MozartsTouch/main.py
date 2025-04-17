@@ -83,6 +83,9 @@ class Entry:
         video_frame_texts = video_processor.process_video()
         self.music_duration = video_processor.video_seconds + 1
         self.video_txt_descriper(video_frame_texts)
+    
+    def init_txt(self, caption):
+        self.txt = caption
 
 
     def img2txt(self):
@@ -216,11 +219,26 @@ def video_to_music_generate(video_path: Path, image_recog: ImageRecognization, m
 
 
     return (entry.txt, entry.converted_txt, entry.result_video_name)
+
+def text_to_music_generate(caption: str, music_duration: int, music_gen: MusicGenerator, output_folder=Path("./outputs")):
+    """
+    Text to music generation as a base model
+    """
+    entry = Entry(image_recog=None, addtxt=None, music_gen=music_gen, music_duration=music_duration, output_folder=output_folder)
+    entry.init_txt(caption)
+    entry.txt_converter()
+    entry.txt2music()
+    entry.save_to_file()
+
+    return (entry.txt, entry.converted_txt, entry.result_file_name)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Mozart\'s Touch: Multi-modal Music Generation Framework')
 
     parser.add_argument('-d', '--test', help='Test mode', default=False, action='store_true')
+    parser.add_argument('--text', help='Text-to-music', default=False, action='store_true')
+    parser.add_argument('--image', help='Image-to-music', default=False, action='store_true')
+    parser.add_argument('--video', help='Video-to-music', default=False, action='store_true')
     
     args = parser.parse_args()
     test_mode = args.test # When True, disables the img2txt feature to save resources, used for debugging the program # True时关闭img2txt功能，节省运行资源，用于调试程序 
@@ -228,14 +246,20 @@ if __name__ == "__main__":
     image_recog = import_ir()
     music_gen = import_music_generator()
     output_folder = module_path / "outputs"
+    music_duration = 10
     addtxt = None
-    
-    # img = Image.open(module_path / "static" / "test.jpg")
-    # music_duration = 10
-    # result = img_to_music_generate(img, music_duration, image_recog, music_gen, output_folder, addtxt)
 
-    video_path = module_path / "static" / "stone.mp4"
-    result = video_to_music_generate(video_path, image_recog, music_gen, output_folder, addtxt)
+    if args.text:
+        caption = "Ella found a stray puppy in the park, muddy and trembling. She brought him home, gave him a bath, and named him Button. That night, he curled up on her bed, tail wagging. For the first time in weeks, she smiled in her sleep."
+        result = text_to_music_generate(caption, music_duration, music_gen, output_folder)
+    elif args.image:
+        img = Image.open(module_path / "static" / "test.jpg")
+        result = img_to_music_generate(img, music_duration, image_recog, music_gen, output_folder, addtxt)
+    elif args.video:
+        video_path = module_path / "static" / "stone.mp4"
+        result = video_to_music_generate(video_path, image_recog, music_gen, output_folder, addtxt)
+    else:
+        raise TypeError("Select generation modality: --text, --image, --video.")
 
     key_names = ("prompt", "converted_prompt", "result_file_name")
 
