@@ -33,7 +33,8 @@ test_mode =  config.get('TEST_MODE', False)
 logger.info(f"Test mode: {test_mode}")
 
 def import_ir():
-    '''导入图像识别模型'''
+    # '''导入图像识别模型'''
+    # Import the image recognition model
     ir = ImageRecognization(test_mode=test_mode)
     return ir
 
@@ -49,7 +50,10 @@ def import_music_generator():
 
 
 class Entry:
-    '''每个Entry代表一次用户输入，然后调用自己的方法对输入进行处理以得到生成结果'''
+    # '''每个Entry代表一次用户输入，然后调用自己的方法对输入进行处理以得到生成结果'''
+    """
+    Each Entry represents a user input, which is then processed by its own method to generate the result.
+    """
     def __init__(self, image_recog:ImageRecognization, music_gen: MusicGenerator,\
                   music_duration: int, addtxt:str, output_folder:Path, img:Image=None, video_path:Path=None) -> None:
         self.img = img
@@ -57,18 +61,20 @@ class Entry:
         self.txt = None
         self.txt_con = TxtConverter()
         self.converted_txt = None
-        self.addtxt = addtxt  # 追加文本输入
-        self.image_recog = image_recog  # 使用传入的图像识别模型对象
-        self.music_gen = music_gen  # 使用传入的音乐生成对象
+        self.addtxt = addtxt  # Append text input # 追加文本输入
+        self.image_recog = image_recog  # Use the provided image recognition model object # 使用传入的图像识别模型对象
+        self.music_gen = music_gen  # Use the provided music generation object # 使用传入的音乐生成对象
         self.music_duration = music_duration
         self.output_folder = output_folder
-        self.timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")  # 记录用户上传时间作为标识符
+        self.timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")  # Record the user's upload time as an identifier # 记录用户上传时间作为标识符
         self.result_urls = None
         self.music_bytes_io = None
 
     def init_video(self):
         assert self.img is None
         # 将视频帧进行采样并分别识别，同时获取视频长度作为self.music_duration，之后调用self.video_txt_descriper合成描述视频的一段话
+        # Sample the video frames and recognize them individually, while also obtaining the video length as self.music_duration.
+        # Then, call self.video_txt_descripter to generate a description of the video.
         video_processor = PreProcessVideos(
             str(self.video_path), 
             self.image_recog, 
@@ -81,24 +87,29 @@ class Entry:
 
     def img2txt(self):
         assert self.video_path is None
-        '''进行图像识别'''
+        # '''进行图像识别'''
+        # Perform image recognition
         self.txt = self.image_recog.img2txt(self.img)
     
     def txt_converter(self):
-        '''利用LLM优化已有的图片描述文本'''
-        self.converted_txt = self.txt_con.txt_converter(self.txt, self.addtxt) # 追加一个附加输入，具体改动参见txt_converter
+        # '''利用LLM优化已有的图片描述文本'''
+        # Use LLM to optimize the existing image description text
+        self.converted_txt = self.txt_con.txt_converter(self.txt, self.addtxt) # Append an additional input, specific changes can be found in txt_converter # 追加一个附加输入，具体改动参见txt_converter
 
     def video_txt_descriper(self, texts):
-        '''将每帧的描述文本转换为视频整体的描述文本'''
+        # '''将每帧的描述文本转换为视频整体的描述文本'''
+        # Convert the description text of each frame into an overall description of the video
         self.txt = self.txt_con.process_video_description(texts)
         logger.info(f"Video description: {self.txt}")
 
     def video_txt_converter(self):
-        '''利用LLM优化已有的视频描述文本'''
+        # '''利用LLM优化已有的视频描述文本'''
+        # Use LLM to optimize the existing video description text
         self.converted_txt = self.txt_con.video_txt_converter(self.txt, self.addtxt) # 追加一个附加输入，具体改动参见txt_converter
 
     def txt2music(self):
-        '''根据文本进行音乐生成，获取生成的音乐的BytesIO或URL'''
+        # '''根据文本进行音乐生成，获取生成的音乐的BytesIO或URL'''
+        # Generate music based on the text and obtain the generated music's BytesIO or URL
         assert self.music_duration
         if self.music_gen.model_name.startswith("Suno"):
             self.result_urls = self.music_gen.generate(self.converted_txt, self.music_duration)
@@ -106,7 +117,8 @@ class Entry:
             self.music_bytes_io = self.music_gen.generate(self.converted_txt, self.music_duration)
 
     def save_to_file(self):
-        '''将音乐保存到`/outputs`中，文件名为用户上传时间的时间戳'''
+        # '''将音乐保存到`/outputs`中，文件名为用户上传时间的时间戳'''
+        # Save the music to `/outputs` with the filename as the timestamp of the user's upload time
         self.output_folder.mkdir(parents=True, exist_ok=True)
 
         self.result_file_name = f"{self.timestamp}.wav"
@@ -115,41 +127,59 @@ class Entry:
         with open(file_path, "wb") as music_file:
             music_file.write(self.music_bytes_io.getvalue())
 
-        logger.info(f"音乐已保存至 {file_path}")
+        # logger.info(f"音乐已保存至 {file_path}")
+        logger.info(f"Music has been saved to {file_path}")
 
         return self.result_file_name
     def merge_audio_video(self):
-        '''合成原视频与生成的音乐'''
+        # '''合成原视频与生成的音乐'''
         # 读取视频文件
+        # Combine the original video with the generated music
+        # Read the video file
         video_clip = VideoFileClip(self.video_path)
         
         # 读取音频数据流
+        # Read the audio data stream
         audio_clip = AudioFileClip(self.output_folder / self.result_file_name)
         
         # 将音频和视频合成
+        # Combine the audio and video
         final_video = video_clip.with_audio(audio_clip)
         self.result_video_name = f"{self.timestamp}.mp4"
         # 输出到文件
+        # Output to file
         final_video.write_videofile(video_file_path := self.output_folder / self.result_video_name)
-        logger.info(f"视频已保存至 {video_file_path}")
+        # logger.info(f"视频已保存至 {video_file_path}")
+        logger.info(f"Video has been saved to {video_file_path}")
         return self.result_video_name
 
 def img_to_music_generate(img: Image, music_duration: int, image_recog: ImageRecognization,\
                            music_gen: MusicGenerator, output_folder=Path("./outputs"), addtxt: str=None):
-    '''模型核心过程'''
-    # 根据输入mode信息获得对应的音乐生成模型类的实例
+    # '''模型核心过程'''
+    # # 根据输入mode信息获得对应的音乐生成模型类的实例
+    # # mg = mgs[mode]
+
+    # # 根据用户输入创建一个类，并传入图像识别和音乐生成模型的实例
+    """
+    Model core process
+    """
+    # Get the corresponding music generation model class instance based on the input mode information
     # mg = mgs[mode]
 
-    # 根据用户输入创建一个类，并传入图像识别和音乐生成模型的实例
+    # Create a class based on user input and pass the instances of the image recognition and music generation models
+
     entry = Entry(image_recog, music_gen, music_duration, addtxt, output_folder, img=img)
 
     # 图片转文字
+    # Image to text
     entry.img2txt()
 
     # 文本优化
+    # Text optimization
     entry.txt_converter()
 
     #文本生成音乐
+    # Text to music generation
     entry.txt2music()
 
     if not music_gen.model_name.startswith("Suno"):
@@ -160,20 +190,28 @@ def img_to_music_generate(img: Image, music_duration: int, image_recog: ImageRec
 
 def video_to_music_generate(video_path: Path, image_recog: ImageRecognization, music_gen: MusicGenerator,\
                              output_folder=Path("./outputs"), addtxt: str=None):
-    '''模型核心过程'''
-    # 根据用户输入创建一个类，并传入图像识别和音乐生成模型的实例
+    # '''模型核心过程'''
+    # # 根据用户输入创建一个类，并传入图像识别和音乐生成模型的实例
+    """
+    Model core process
+    """
+    # Create a class based on user input and pass the instances of the image recognition and music generation models
     entry = Entry(image_recog, music_gen, None, addtxt, output_folder, video_path=video_path)
     # 视频采样、识别
+    # Video sampling and recognition
     entry.init_video()
 
     # 文本优化
+    # Text optimization
     entry.video_txt_converter()
 
     # 文本生成音乐
+    # Text to music generation
     entry.txt2music()
     entry.save_to_file()
 
     # 合成视频
+    # Video synthesis
     entry.merge_audio_video()
 
 
@@ -185,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--test', help='Test mode', default=False, action='store_true')
     
     args = parser.parse_args()
-    test_mode = args.test # True时关闭img2txt功能，节省运行资源，用于调试程序
+    test_mode = args.test # When True, disables the img2txt feature to save resources, used for debugging the program # True时关闭img2txt功能，节省运行资源，用于调试程序 
 
     image_recog = import_ir()
     music_gen = import_music_generator()
