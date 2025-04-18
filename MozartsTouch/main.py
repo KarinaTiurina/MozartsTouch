@@ -119,12 +119,15 @@ class Entry:
         else:
             self.music_bytes_io = self.music_gen.generate(self.converted_txt, self.music_duration)
 
-    def save_to_file(self):
+    def save_to_file(self, file_name=None):
         # '''将音乐保存到`/outputs`中，文件名为用户上传时间的时间戳'''
         # Save the music to `/outputs` with the filename as the timestamp of the user's upload time
         self.output_folder.mkdir(parents=True, exist_ok=True)
 
-        self.result_file_name = f"{self.timestamp}.wav"
+        if file_name:
+            self.result_file_name = file_name
+        else:
+            self.result_file_name = f"{self.timestamp}.wav"
         file_path = self.output_folder / self.result_file_name
 
         with open(file_path, "wb") as music_file:
@@ -220,7 +223,8 @@ def video_to_music_generate(video_path: Path, image_recog: ImageRecognization, m
 
     return (entry.txt, entry.converted_txt, entry.result_video_name)
 
-def text_to_music_generate(caption: str, music_duration: int, music_gen: MusicGenerator, output_folder=Path("./outputs")):
+def text_to_music_generate(caption: str, music_duration: int, music_gen: MusicGenerator, 
+                           output_folder=Path("./outputs"), file_name=None):
     """
     Text to music generation as a base model
     """
@@ -228,7 +232,7 @@ def text_to_music_generate(caption: str, music_duration: int, music_gen: MusicGe
     entry.init_txt(caption)
     entry.txt_converter()
     entry.txt2music()
-    entry.save_to_file()
+    entry.save_to_file(file_name=file_name)
 
     return (entry.txt, entry.converted_txt, entry.result_file_name)
     
