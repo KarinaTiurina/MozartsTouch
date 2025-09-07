@@ -132,7 +132,7 @@ class PreProcessVideos:
             raise ValueError(f"{video_path} does not exist.")
 
         # try:
-        video_reader = VideoReader(video_path, ctx=cpu(0))
+        video_reader = VideoReader(video_path, ctx=cpu(0), num_threads=1)
         self.video_frames = int(len(video_reader))
         self.video_seconds = self.video_frames // video_reader.get_avg_fps()
         frame_step = abs(self.video_frames // self.prompt_amount)

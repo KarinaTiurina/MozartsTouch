@@ -7,6 +7,10 @@ import argparse
 import yaml
 from loguru import logger
 from moviepy import VideoFileClip, AudioFileClip
+import os
+import logging
+import json
+import pandas as pd
 
 
 '''
@@ -160,7 +164,7 @@ class Entry:
         return self.result_video_name
 
 def img_to_music_generate(img: Image, music_duration: int, image_recog: ImageRecognization,\
-                           music_gen: MusicGenerator, output_folder=Path("./outputs"), addtxt: str=None):
+                           music_gen: MusicGenerator, output_folder=Path("./outputs"), addtxt: str=None, file_name=None):
     # '''模型核心过程'''
     # # 根据输入mode信息获得对应的音乐生成模型类的实例
     # # mg = mgs[mode]
@@ -190,12 +194,13 @@ def img_to_music_generate(img: Image, music_duration: int, image_recog: ImageRec
 
     if not music_gen.model_name.startswith("Suno"):
         # print("Here.")
-        entry.save_to_file()
+        entry.save_to_file(file_name=file_name)
 
-    return (entry.txt, entry.converted_txt, entry.result_file_name)
+    # return (entry.txt, entry.converted_txt, entry.result_file_name)
+    return (None, None, None)
 
 def video_to_music_generate(video_path: Path, image_recog: ImageRecognization, music_gen: MusicGenerator,\
-                             output_folder=Path("./outputs"), addtxt: str=None):
+                             output_folder=Path("./outputs"), addtxt: str=None, file_name=None):
     # '''模型核心过程'''
     # # 根据用户输入创建一个类，并传入图像识别和音乐生成模型的实例
     """
@@ -214,14 +219,15 @@ def video_to_music_generate(video_path: Path, image_recog: ImageRecognization, m
     # 文本生成音乐
     # Text to music generation
     entry.txt2music()
-    entry.save_to_file()
+    entry.save_to_file(file_name=file_name)
 
     # 合成视频
     # Video synthesis
-    entry.merge_audio_video()
+    # entry.merge_audio_video()
 
 
-    return (entry.txt, entry.converted_txt, entry.result_video_name)
+    # return (entry.txt, entry.converted_txt, entry.result_video_name)
+    return (None, None, None)
 
 def text_to_music_generate(caption: str, music_duration: int, music_gen: MusicGenerator, 
                            output_folder=Path("./outputs"), file_name=None):
@@ -242,7 +248,14 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--test', help='Test mode', default=False, action='store_true')
     parser.add_argument('--text', help='Text-to-music', default=False, action='store_true')
     parser.add_argument('--image', help='Image-to-music', default=False, action='store_true')
+    parser.add_argument('--image_file', help='Path to input image', default=None, type=str)
     parser.add_argument('--video', help='Video-to-music', default=False, action='store_true')
+    parser.add_argument('--video_file', help='Path to input video', default=None, type=str)
+    parser.add_argument('--output_filename', help='Output filename', default=None, type=str)
+    parser.add_argument('--muvideo', help="Run generation on MUVideo dataset", default=False, action='store_true')
+    parser.add_argument('--imemnet', help="Run generation on IMEMNet dataset", default=False, action='store_true')
+    parser.add_argument('--custom', help="Run generation on custom csv file", default=False, action='store_true')
+    parser.add_argument('--output_folder', help='Output folder path', default=None, type=str)
     
     args = parser.parse_args()
     test_mode = args.test # When True, disables the img2txt feature to save resources, used for debugging the program # True时关闭img2txt功能，节省运行资源，用于调试程序 
@@ -257,16 +270,99 @@ if __name__ == "__main__":
         caption = "Ella found a stray puppy in the park, muddy and trembling. She brought him home, gave him a bath, and named him Button. That night, he curled up on her bed, tail wagging. For the first time in weeks, she smiled in her sleep."
         result = text_to_music_generate(caption, music_duration, music_gen, output_folder)
     elif args.image:
-        img = Image.open(module_path / "static" / "test.jpg")
-        result = img_to_music_generate(img, music_duration, image_recog, music_gen, output_folder, addtxt)
+        output_folder = Path('/home2/faculty/ktiurina/composer/data/survey')
+        if (args.output_filename is not None):
+            output_filename = args.output_filename
+        else:
+            output_filename = 'demo.wav'
+        if (args.image_file is not None):
+            img = Image.open(Path(args.image_file))
+        else:
+            img = Image.open(module_path / "static" / "test.jpg")
+        result = img_to_music_generate(img, music_duration, image_recog, music_gen, output_folder, addtxt, output_filename)
     elif args.video:
-        video_path = module_path / "static" / "stone.mp4"
-        result = video_to_music_generate(video_path, image_recog, music_gen, output_folder, addtxt)
+        output_folder = Path('/home2/faculty/ktiurina/composer/data/survey')
+        if (args.output_filename is not None):
+            output_filename = args.output_filename
+        else:
+            output_filename = 'demo.wav'
+        if (args.video_file is not None):
+            video_path = Path(args.video_file)
+        else:
+            video_path = module_path / "static" / "stone.mp4"
+        result = video_to_music_generate(video_path, image_recog, music_gen, output_folder, addtxt, output_filename)
+    elif args.custom:
+        logger.info("Start generating for custom dataset")
+        output_folder = Path(args.output_folder)
+        custom_styles = '/home2/faculty/ktiurina/composer/data/custom/MusicTheory.csv'
+        styles_df = pd.read_csv(custom_styles)
+        music_duration = 30
+        os.makedirs(output_folder, exist_ok=True)
+        for index, row in styles_df.iterrows():
+            file_id = row['musicTheoryTerm'].replace("/", "_")
+            output_filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, f'{file_id}.wav')
+            if os.path.isfile(outfile):
+                print(f"Sample {file_id} already generated. Skip")
+            else:
+                print(row['prompt'])
+                result = text_to_music_generate(row['prompt'], music_duration, music_gen, output_folder, output_filename)
+                print(f"Generated {output_filename}")
+    elif args.imemnet:
+        logger.info("Start generating for IMEMNet dataset")
+        images_folder = '/home2/faculty/ktiurina/composer/data/IMEMNet/images_processed'
+        output_folder = Path('/home2/faculty/ktiurina/composer/data/generated/IMEMNet/MozartsTouch')
+        os.makedirs(output_folder, exist_ok=True)
+        jpg_files = [f for f in os.listdir(images_folder) if f.lower().endswith('.jpg')]
+        music_duration = 30
+        for input_image in jpg_files:
+            file_id = input_image.split('.')[0]
+            output_filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, f'{file_id}.wav')
+            if os.path.isfile(outfile):
+              print(f"Sample {file_id} already generated. Skip")
+            else:
+                image_path = os.path.join(images_folder, input_image)
+                img = Image.open(Path(image_path))
+                prompt = 'Generate music for the image'
+                result = img_to_music_generate(img, music_duration, image_recog, music_gen, output_folder, prompt, output_filename)
+                print(f"Generated {output_filename}")
+    elif args.muvideo:
+        logger.info("Start generating for MUVideo dataset")
+        muvideo_instructions = '/home2/faculty/ktiurina/composer/data/MUVideo/MUVideoInstructions.json'
+        videos_folder = '/home2/faculty/ktiurina/composer/data/MUVideo/muvideo_videos/hpctmp/e0589920/MUGen/data/MUVideo/audioset_video'
+        with open(muvideo_instructions, 'r') as file:
+            MuVideo = json.load(file)
+        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MUVideo/MozartsTouch'
+        os.makedirs(output_folder, exist_ok=True)
+        output_folder = Path(output_folder)
+        for sample in MuVideo:
+            file_id = sample['input_file'].split('.')[0]
+            output_filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, f'{file_id}.wav')
+            if os.path.isfile(outfile):
+                logger.info(f"Sample {file_id} already generated. Skip")
+            else:
+                logger.info(f"Start generating for {file_id}")
+                video_path = os.path.join(videos_folder, sample['input_file'])
+                human_msg = [msg for msg in sample['conversation'] if msg.get('from') == 'human']
+                if len(human_msg) > 0:
+                    prompt = human_msg[0]['value']
+                else:
+                    prompt = 'Generate music for the video'
+                try:
+                    video_to_music_generate(Path(video_path), image_recog, music_gen, output_folder, addtxt, output_filename)
+                    logger.info(f"Generated {output_filename}")
+                except Exception as e:
+                    logger.info('ERROR: ', e)
+                    logging.exception("Error while generating music for MUVideo")
+
     else:
         raise TypeError("Select generation modality: --text, --image, --video.")
 
-    key_names = ("prompt", "converted_prompt", "result_file_name")
+    # key_names = ("prompt", "converted_prompt", "result_file_name")
 
-    result_dict =  {key: value for key, value in zip(key_names, result)}
+    # result_dict =  {key: value for key, value in zip(key_names, result)}
 
-    logger.info(result_dict)
+    # logger.info(result_dict)
+    logger.info("Done.")

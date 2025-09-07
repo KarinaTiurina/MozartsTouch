@@ -9,10 +9,16 @@ from loguru import logger
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 module_path = Path(__file__).resolve().parent.parent.parent
 
+# print(f"Allocated: {torch.cuda.memory_allocated() / 1e6}MB")
+# print(f"Reserved: {torch.cuda.memory_reserved() / 1e6}MB")
+
 class MusicGen:
     def __init__(self, model_name="musicgen_small") -> None:
         self.processor = AutoProcessor.from_pretrained(module_path / "model" / f"{model_name}_processor")
-        self.model = MusicgenForConditionalGeneration.from_pretrained(module_path / "model" / f"{model_name}_model").to(device)
+        self.model = MusicgenForConditionalGeneration.from_pretrained(
+                module_path / "model" / f"{model_name}_model",
+                attn_implementation="eager"
+                ).to(device)
         self.sampling_rate = self.model.config.audio_encoder.sampling_rate
 
     def generate(self, text: str, music_duration: int) -> BytesIO:
@@ -24,7 +30,10 @@ class MusicGen:
             padding=True,
             return_tensors="pt",
         ).to(device)
-        audio_values = self.model.generate(**inputs, max_new_tokens=int(256 * music_duration // 5)) # music_duration为秒数，256token = 5s 
+        audio_values = self.model.generate(
+                **inputs, 
+                max_new_tokens=int(256 * music_duration // 5),
+                guidance_scale=3.5) # music_duration为秒数，256token = 5s 
 
         wav_file_data = BytesIO()
         scipy.io.wavfile.write(wav_file_data, rate=self.sampling_rate, data=audio_values[0, 0].cpu().numpy())
