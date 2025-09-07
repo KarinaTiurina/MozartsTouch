@@ -256,6 +256,8 @@ if __name__ == "__main__":
     parser.add_argument('--imemnet', help="Run generation on IMEMNet dataset", default=False, action='store_true')
     parser.add_argument('--custom', help="Run generation on custom csv file", default=False, action='store_true')
     parser.add_argument('--output_folder', help='Output folder path', default=None, type=str)
+    parser.add_argument('--instructions', help='Instructions file or folder', default=None, type=str)
+    parser.add_argument('--input_folder', help='Folder with input files', default=None, type=str)
     
     args = parser.parse_args()
     test_mode = args.test # When True, disables the img2txt feature to save resources, used for debugging the program # True时关闭img2txt功能，节省运行资源，用于调试程序 
@@ -270,7 +272,7 @@ if __name__ == "__main__":
         caption = "Ella found a stray puppy in the park, muddy and trembling. She brought him home, gave him a bath, and named him Button. That night, he curled up on her bed, tail wagging. For the first time in weeks, she smiled in her sleep."
         result = text_to_music_generate(caption, music_duration, music_gen, output_folder)
     elif args.image:
-        output_folder = Path('/home2/faculty/ktiurina/composer/data/survey')
+        output_folder = Path(args.output_folder)
         if (args.output_filename is not None):
             output_filename = args.output_filename
         else:
@@ -281,7 +283,7 @@ if __name__ == "__main__":
             img = Image.open(module_path / "static" / "test.jpg")
         result = img_to_music_generate(img, music_duration, image_recog, music_gen, output_folder, addtxt, output_filename)
     elif args.video:
-        output_folder = Path('/home2/faculty/ktiurina/composer/data/survey')
+        output_folder = Path(args.output_folder)
         if (args.output_filename is not None):
             output_filename = args.output_filename
         else:
@@ -294,7 +296,7 @@ if __name__ == "__main__":
     elif args.custom:
         logger.info("Start generating for custom dataset")
         output_folder = Path(args.output_folder)
-        custom_styles = '/home2/faculty/ktiurina/composer/data/custom/MusicTheory.csv'
+        custom_styles = args.instructions
         styles_df = pd.read_csv(custom_styles)
         music_duration = 30
         os.makedirs(output_folder, exist_ok=True)
@@ -310,8 +312,8 @@ if __name__ == "__main__":
                 print(f"Generated {output_filename}")
     elif args.imemnet:
         logger.info("Start generating for IMEMNet dataset")
-        images_folder = '/home2/faculty/ktiurina/composer/data/IMEMNet/images_processed'
-        output_folder = Path('/home2/faculty/ktiurina/composer/data/generated/IMEMNet/MozartsTouch')
+        images_folder = args.input_folder
+        output_folder = Path(args.output_folder)
         os.makedirs(output_folder, exist_ok=True)
         jpg_files = [f for f in os.listdir(images_folder) if f.lower().endswith('.jpg')]
         music_duration = 30
@@ -329,11 +331,11 @@ if __name__ == "__main__":
                 print(f"Generated {output_filename}")
     elif args.muvideo:
         logger.info("Start generating for MUVideo dataset")
-        muvideo_instructions = '/home2/faculty/ktiurina/composer/data/MUVideo/MUVideoInstructions.json'
-        videos_folder = '/home2/faculty/ktiurina/composer/data/MUVideo/muvideo_videos/hpctmp/e0589920/MUGen/data/MUVideo/audioset_video'
+        muvideo_instructions = args.instructions
+        videos_folder = args.input_folder
         with open(muvideo_instructions, 'r') as file:
             MuVideo = json.load(file)
-        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MUVideo/MozartsTouch'
+        output_folder = args.output_folder
         os.makedirs(output_folder, exist_ok=True)
         output_folder = Path(output_folder)
         for sample in MuVideo:
